@@ -1,0 +1,1294 @@
+---
+title: "Rapport Experience III"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+**Nom de l'experience :** PROFIL
+
+**Nombre de participants :** 20
+
+**Longueur circuit :** 75 Km
+
+**Date de recueillir des données :** du 07/11/2016 au 16/12/2016
+
+**Description des données recueilliers par participant:** Acquisition via RTMaps
+
+ - Un fichier CAN
+  
+ - Deux fichiers GPS
+  
+ - Un fichier centrale inertielle
+
+
+**Les variables d’intérêts des fichiers CAN-GPS :**
+
+  - Timestamp (timestamp) : AAAA/MM/JJ HH:MM:SS.ffffff
+
+   Données CAN
+   
+  - Vitesse instantanée du véhicule (VehicleSpeed)
+  
+  - Odomètre (Odometer) : en mètres
+  
+  - Distance cumulée (Odometre_pk) : en mètres
+
+   Données GPS
+   
+  - Latitude (_GPS_Latitude)
+  
+  - Longitude (_GPS_Longitude)
+  
+  - _Vitesse estimée par le GPS_ (_GPS_Speed_over_ground)_
+
+\newpage
+
+# Liste des librairies utilisées pour cette expériance
+
+```{r, warning = FALSE, message = FALSE, results = 'hide'}
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(utils)
+library(kml)
+library(forcats)
+library(stringr)
+library(readr)
+library(lme4)
+library(lmerTest)
+library(fastDummies)
+library(sjPlot)
+library(randomcoloR)
+library(gridExtra)
+library(grid)
+library(geosphere)
+library(interactions)
+library(kableExtra)
+library(purrr)
+library(tidyverse)
+library(zoo)
+library(DataCombine)
+```
+#Liste des librairies Analyses spatiales
+
+```{r, warning = FALSE, message = FALSE, results = 'hide'}
+library(sp)
+library(rgdal)
+library(maptools)
+library(raster)
+library(adehabitatHR)
+library(adehabitatHS)
+library(adehabitatLT)
+library(adehabitatMA)
+library(dismo)
+library(gstat)
+library(rgeos)
+library(spatstat)
+library(spdep)
+library(st)
+library(fs)
+library(sf)
+library(magrittr)
+library(leaflet)
+library(gdalcubes)
+library(gdalUtilities)
+library(gdalUtils)
+library(ggmap)
+library(lubridate)
+library(geosphere)
+library(ramify)
+```
+
+
+\newpage
+# Importation des données
+
+```{r, warning = FALSE, message = FALSE, results = 'hide'}
+
+
+infra_Expe03 <- readOGR(dsn ="C:/Users/Inspiron/Desktop/Data/SURCA_Circuit_Expe03_210319_1510.kml",
+                        layer = "Expe03_Infra", verbose = TRUE, 
+                        drop_unsupported_fields=T, dropNULLGeometries=T)
+
+VMA_small_Expe03 <- readOGR(dsn ="C:/Users/Inspiron/Desktop/Data/SURCA_Circuit_Expe03_210319_1510.kml",
+                     layer = "Expe03_VMA_small", verbose = TRUE, 
+                     drop_unsupported_fields=T, dropNULLGeometries=T)
+```
+
+
+Au total `r ncol(data_Expe03)` variables pour `r nrow(data_Expe03)` enregistrements. Voici la forme du jeu de données que nous allons traiter (10 lignes aléatoires sélectionnées) 
+
+```{r}
+kable(sample_n(data_Expe03, 10), "latex", booktabs = T, linesep = "") %>%
+  kable_styling(position = "center",latex_options = "HOLD_position")
+```
+
+# préparation de données 
+
+
+La fonction qui permet d'importer un fichier.kmz sans le dézipper 
+
+```{r, warning = FALSE, message = FALSE, results = 'hide'}
+read_kmz <- function(file) {
+  # get file extension
+  ext <- strsplit(basename(file), split = '\\.')[[1]][-1]
+  
+  # if kml
+  if (ext == 'kml') {
+    layers <- st_layers(file)$name
+    
+    if (length(layers) > 1) {
+      return(Reduce('rbind', lapply(layers, sf::read_sf, dsn = file)))
+    }
+    
+    return(read_sf(file))
+  } else {
+    target_file <- '.temp.kml.zip'
+    
+    fs::file_copy(file, target_file, overwrite = T)
+    unzip(target_file, overwrite = T)
+    
+    sf_out <- read_sf('doc.kml')
+    
+    fs::file_delete(target_file)
+    fs::file_delete('doc.kml')
+    
+    return(sf_out)
+  }
+}
+
+kmz_Expe03 <- read_kmz("C:/Users/Inspiron/Desktop/Data/SURCA_Circuit_Expe03_210319_1510.kmz")
+```
+
+# Le trajet de l'expérience 3
+
+```{r}
+plot(kmz_Expe03[2])
+```
+
+\newpage
+
+# lecture de la couche "Expe03_Infra" qui contient les infrastructures
+
+extraction des infrastructures et leurs coordonnées
+```{r}
+coordinates_Expe03 <- as.data.frame(coordinates(infra_Expe03))
+nom_infra_Expe03 <- as.data.frame(infra_Expe03@data)
+coordinates_Expe03 <- coordinates_Expe03[,2:1]
+```
+
+
+La fonction qui supprime les caractères en plus dans la colonne infra
+
+```{r}
+suppression_plus <- function(d){
+  x <- c()
+  for(i in length(d$Name):1){
+    x <-c(substr(d$Name[i],5,6),x)
+  }
+  return(x)
+}
+
+nom_infra_Expe03 <-as.data.frame(suppression_plus(nom_infra_Expe03))
+```
+
+
+Concaténation des deux data frame "coordinates_Expe03" et "nom_infra_Expe03"
+
+```{r}
+liste_infra_Expe03 <- bind_cols(coordinates_Expe03,nom_infra_Expe03)
+```
+
+Renomination des colonnes pour avoir les mêmes noms que le jeu de données 2020
+
+```{r}
+colnames(liste_infra_Expe03) <- c("Latitude","Longitude","Infra")
+```
+
+
+Une longitude négative correspond à une longitude Ouest (par à port à la ligne greenwich)
+
+Au total `r ncol(liste_infra_Expe03)` variables pour `r nrow(liste_infra_Expe03)` enregistrements. Voici la forme du jeu de données que nous allons traiter (10 lignes aléatoires sélectionnées) 
+
+```{r}
+kable(sample_n(liste_infra_Expe03, 10), "latex", booktabs = T, linesep = "") %>%
+  kable_styling(position = "center",latex_options = "HOLD_position")
+```
+Nombre d'apparition d'une infrastructure dans le trajet de l'expérience
+
+```{r}
+infrastructures_trajet <- table(liste_infra_Expe03$Infra)%>% as.data.frame()
+colnames(infrastructures_trajet) <- c("infrastructure","Frequence")
+```
+
+
+```{r, echo = FALSE, fig.width=10, fig.height=6}
+p<- ggplot(infrastructures_trajet, aes( x = reorder(infrastructure, -Frequence), y = Frequence, fill =    as.factor(infrastructure))) +
+    geom_bar(stat="identity", width=0.5, position=position_dodge(width=0.2)) +
+    geom_text(aes(label=Frequence), vjust= -0.2, color="black", size=3.5)+
+    labs(title = "Nombre d'apparition de l'infrastructure dans le trajet de l'expérience", x = "L'infrastructure",
+          y = "Nombre d'apparition")+ theme(legend.position="none")
+plot(p)
+```
+
+\newpage
+
+# lecture de la couche "Expe03_VMA_small" 
+
+cette couche contient les panneaux utiles à l'identification des changements de vitesse maximale prescrite, et elle contient également des repères pour signifier des changements de vitesse non associés à des panneaux de vitesse ou d'agglomération
+
+
+Extraction des panneaux de limitation de vitesse et leurs coordonnées
+```{r}
+coordinates_SpeedLimit <- as.data.frame(coordinates(VMA_small))
+SpeedLimit_Expe03 <- as.data.frame(VMA_small@data)
+coordinates_SpeedLimit <- coordinates_SpeedLimit[,2:1]
+```
+
+
+# Nettoyage des données 
+
+```{r, warning = FALSE, message = FALSE, results = 'hide'}
+SpeedLimit_Expe03 <- subset( SpeedLimit_Expe03, select = -2 )
+colnames(SpeedLimit_Expe03) <- c("SpeedLimit")
+```
+
+
+
+```{r, warning = FALSE, message = FALSE, results = 'hide'}
+SpeedLimit_Expe03 <- subset( SpeedLimit_Expe03, select = -2 )
+colnames(SpeedLimit_Expe03) <- c("SpeedLimit")
+
+# Agglo_Fin -> 90 km/h
+SpeedLimit_Expe03$SpeedLimit <- replace(SpeedLimit_Expe03$SpeedLimit, SpeedLimit_Expe03$SpeedLimit == 
+"51_Agglo_Fin_Rive_Droite", "51_90_Rive_Droite")
+
+SpeedLimit_Expe03$SpeedLimit <- replace(SpeedLimit_Expe03$SpeedLimit, SpeedLimit_Expe03$SpeedLimit == 
+"74_Agglo_Fin_Rive_Droite (Plouha)", "74_90_Rive_Droite (Plouha)")
+
+# les autres VMA
+SpeedLimit_Expe03 <-separate(SpeedLimit_Expe03, SpeedLimit, c("id", "SpeedLimit", "A", "B", "C"), sep = "_")
+
+SpeedLimit_Expe03 <- subset(SpeedLimit_Expe03, select = c(SpeedLimit))
+
+# la vitesse sur Agglomération est 50 km/h
+SpeedLimit_Expe03$SpeedLimit <- replace(SpeedLimit_Expe03$SpeedLimit, SpeedLimit_Expe03$SpeedLimit == "Agglo", 50)
+
+# "F70" -> 80
+SpeedLimit_Expe03$SpeedLimit <- replace(SpeedLimit_Expe03$SpeedLimit, SpeedLimit_Expe03$SpeedLimit == "F70", 90)
+
+# "F50" -> 60
+SpeedLimit_Expe03$SpeedLimit <- replace(SpeedLimit_Expe03$SpeedLimit, SpeedLimit_Expe03$SpeedLimit == "F50", 90)
+
+SpeedLimit_Expe03$SpeedLimit <- as.double(SpeedLimit_Expe03$SpeedLimit)
+```
+
+Concaténation des deux data frame "coordinates_SpeedLimit" et "SpeedLimit_Expe03"
+
+```{r}
+liste_SpeedLimit_Expe03 <- bind_cols(SpeedLimit_Expe03,coordinates_SpeedLimit)
+```
+
+Renomination des colonnes
+
+```{r}
+colnames(liste_SpeedLimit_Expe03) <- c("SpeedLimit","Latitude","Longitude")
+```
+
+les distances cumulé parcurus au niveau des panneaux des VMA
+
+```{r}
+dis_cum_VMA<-c(102.8, 166.8, 333.5, 2184.1, 8458.2, 8498.2, 9144.4, 9354.7, 10862.2, 11166.1, 11248.1, 12141, 13998.5, 15133.9, 17690.9, 21389.8, 21747.9, 22291.6, 22753.5, 26928.3, 27897.7, 28386, 28689.8, 29226.3, 29406.3, 29662.4, 30562.8, 31592.6, 31894.5, 34620.8, 37419, 37753.6, 38740.7, 46216.2, 46618.1, 58364.1, 58557.5, 60385.3, 61100.3,61411.4, 65953.7, 72615.1, 72741.6, 72961.8, 74647.1)
+
+```
+
+```{r}
+dis_cum_VMA <- as.data.frame(dis_cum_VMA )
+# Concaténation des deux data frame "liste_infra_Expe03" et "dis_cum_VMA"
+liste_SpeedLimit_Expe03 <- bind_cols(liste_SpeedLimit_Expe03,dis_cum_VMA)
+```
+
+####################################################################################
+```{r}
+#odometre_pk 74605.3
+#GPS_Latitude	48.4991
+#GPS_Longitude	-2.74984
+```
+####################################################################################
+
+ajouter une ligne
+```{r}
+# 200_50_NoSign 
+# la VMA est de 30 km/h dès l'entrée sur la rue Jules Vallès car le panneau est visible et en cohérence avec la VMA # pratiquées dans le sens inverse. ET
+# On considère qu'à partir de la rue Henri Becquerel, la vitesse prescrite est de 50 km/h car dans l'autre sens, # #c'est ce qu'indique la signalisation.
+
+VMA_200_30_NoSign <- rbind(30, 48.4991, -2.74984, 74605.3)
+liste_SpeedLimit_Expe03I <- InsertRow(liste_SpeedLimit_Expe03, NewRow = VMA_200_30_NoSign, RowNum = 45)
+```
+
+## Une longitude négative correspond à une longitude Ouest (par à port au greenwich)
+
+Au total `r ncol(liste_SpeedLimit_Expe03)` variables pour `r nrow(liste_SpeedLimit_Expe03)` enregistrements. Voici la forme du jeu de données que nous allons traiter (10 lignes aléatoires sélectionnées) 
+
+```{r}
+kable(sample_n(liste_SpeedLimit_Expe03, 10), "latex", booktabs = T, linesep = "") %>%
+  kable_styling(position = "center",latex_options = "HOLD_position")
+```
+
+**Nombre d'apparition de la vitesse limite dans le trajet de l'expérience.**
+
+```{r, echo = FALSE, fig.width=10, fig.height=6}
+Speed_Limit_trajet <- table(liste_SpeedLimit_Expe03I$SpeedLimit)%>% as.data.frame()
+colnames(Speed_Limit_trajet) <- c("Speed_Limit","Frequence")
+
+p<- ggplot(Speed_Limit_trajet, aes( x = reorder(Speed_Limit, -Frequence), y = Frequence, fill =    as.factor(Speed_Limit))) +
+    geom_bar(stat="identity", width=0.5, position=position_dodge(width=0.2)) +
+    geom_text(aes(label=Frequence), vjust= -0.2, color="black", size=3.5)+
+    labs(title = "Nombre d'apparition de la vitesse limite dans le trajet de l'expérience", x = "La vitesse limite",
+          y = "Nombre d'apparition")+ theme(legend.position="none")
+plot(p)
+```
+
+
+\newpage
+
+# Traitement des données de l'expérience 
+
+Les variables pertinentes pour répondre à notre problématique sont les suivantes :
+- la variable et son nom équivalant aux données de 2020:
+
+- Identifiants du conducteur (ID_Sujet) -------------> DriverID
+- Vitesse instantanée en km/h (CAN_VehiculeSpeed) ---> InstantSpeed_CAN
+- L'unité de temps (timestamp)  ---------------------> Timestamp
+- GPS_Longitude et GPS_Latitude en WGS84 ------------> longitude et latitude
+- La limitation de vitesse (SpeedLimit) -------------> SpeedLimit
+- L'ID de relevé (NumRecord) ------------------------> NumRecord
+
+Dans cette expérience, pour pouvoir rexécuter les fonctions faites durant le stage 2020, On adapte le jeu de données en fusant des fonctions qui permettent:
+
+  - Ajouter la colonne NumRecord.
+  - Transformer les dates de l'expérience en format Unix (correspond au nombre de secondes écoulées depuis le           premier janvier 1970 à minuit).
+  - Extraire les limites de vitesse pour chaque positionnement sur le trajet dans l'expérience.
+  
+
+```{r}
+data_Expe03 <- data_Expe03  %>% dplyr::select (ID_Sujet, CAN_VehicleSpeed, timestamp,Odometre_Pk, GPS_Latitude, GPS_Longitude)
+```
+
+Au total `r ncol(data_Expe03)` variables pour `r nrow(data_Expe03)` enregistrements. Voici la forme du jeu de données que nous allons traiter (10 lignes aléatoires sélectionnées) :
+
+```{r}
+kable(sample_n(data_Expe03, 10), "latex", booktabs = T, linesep = "") %>%
+  kable_styling(position = "center",latex_options = "HOLD_position")
+```
+# Transformer les dates de l'expérience en format Unix
+
+```{r}
+calcule_timestamp <- function(d){
+  times <- c()
+  times <- as.numeric(as.POSIXct(d$timestamp))*1000
+  return(times)
+}
+
+data_Expe03$timestamp <- calcule_timestamp(data_Expe03)
+```
+
+
+
+# Création de la colonne NumRecord 
+
+cette colonne Crée un vecteur d'éléments séquencés pour chaque conducteur 
+
+```{r}
+debut_conducteur <- function(d){
+  # false pour chaque début de nouveau conducteur
+  d$lagID <- d$ID_Sujet==lag(d$ID_Sujet) 
+  #Remplace le NA de début de df avec FALSE
+  d$lagID[is.na(d$lagID)] <- "FALSE"
+  d$lagID<- as.logical(d$lagID)
+  #compter de premier FALSE inclus au deuxième FALSE exclus
+  lst_indice_debut_conducteur <- c()
+  
+  for (i in 1: nrow(d)) {
+    if(d$lagID[i] == FALSE){
+      lst_indice_debut_conducteur <- c(lst_indice_debut_conducteur,i)
+    }
+  }
+  # Ajouter l'indice de la dernière ligne
+  lst_indice_debut_conducteur <-  c(lst_indice_debut_conducteur,nrow(d)) 
+  return(lst_indice_debut_conducteur)
+  
+}
+indice_debut_conducteur <-debut_conducteur(data_Expe03)
+```
+
+Compter le nombres séquencés pour chaque conducteur 
+```{r, results = 'hide'}
+Colonne_NumRecord <- function(d,lst_indice){
+  pb <- txtProgressBar(min = 1, max = (length(lst_indice)) , style = 3)
+  Record1 <- c()
+  Record2 <- c()
+  for (j in 2: length(lst_indice)) {
+    Record1 <- seq(1, lst_indice[j]-lst_indice[j-1])
+    Record2 <- c(Record2,Record1)
+  }
+  # on ajoute l'indice de la dernière ligne de data Frame
+  Record2 <- c(Record2,Record2[length(Record2)]+1)
+  setTxtProgressBar(pb, j)
+  return(Record2)
+}
+data_Expe03$NumRecord <- Colonne_NumRecord(data_Expe03,indice_debut_conducteur)
+```
+
+```{r, results = 'hide'}
+colonne_VMA <- function(d1,d2,lst_indice){
+  pb <- txtProgressBar(min = 1, max = (length(lst_indice)-1) , style = 3)
+  liste_vitesse <- rep(NA, nrow(d1))
+  distance2 <- 0
+  # calcule la distance entre les panneaux et toutes les positions de la voiture
+  for (l in 1:(length(lst_indice)-1)) { 
+    # les données de l'expérience
+    infos_Expe4<-cbind(d1$GPS_Longitude[lst_indice[l]:lst_indice[l+1]-1],
+                       d1$GPS_Latitude[lst_indice[l]:lst_indice[l+1]-1]) 
+    dist_min <- c(1)
+    # le data frame qui contient les panneaux de limitation de vitesse
+    for (i in 2: nrow(d2)) { 
+      liste_distance <- c()
+      distance2 <- distm (c(d2$Longitude[i],d2$Latitude[i]),infos_Expe4, 
+                          fun = distHaversine)
+      liste_distance <-c(liste_distance,distance2)
+      #l'indice de la distance la plus courte
+      dist_min <- c(dist_min, which.min(liste_distance)) 
+    }
+    #place les indices des distances les plus courtes dans le vecteur liste_vitesse
+    for (j in 1: length(dist_min)) { 
+      liste_vitesse[dist_min[j]+lst_indice[l]-1] = d2$SpeedLimit[j]
+    }
+    setTxtProgressBar(pb, l)
+  }
+  # Complète les NA par la VMA de l'indice d'avant
+  return(na.locf(liste_vitesse)) 
+}
+data_Expe03$SpeedLimit <-colonne_VMA(data_Expe03, liste_SpeedLimit_Expe03,indice_debut_conducteur)
+```
+
+la collone récupere les limites de vitesse pour chaque positionnement sur le trajet dans l'expérience
+
+```{r,message=FALSE}
+colonne_VMA <- function(d1,d2){
+# d1 data frame qui contient les points GPS
+# d2 data frame qui contient les panneaux
+  lst_indice = debut_conducteur(d1) 
+  pb <- txtProgressBar(min = 1, max = (length(lst_indice)-1) , style = 3)
+  
+  
+  #on fait l'appele à la fonction qui extrait les indices de début de chaque conducteur 
+
+  d <- d1 # un data frame vide 
+  d <- d[-(1:nrow(d)),]
+
+  d1$SpeedLimit <-NA
+  # calcule la distance entre les panneaux et toutes les positions de la voiture
+  
+  for (l in 1:(length(lst_indice)-1)) { # boucle sur les conducteurs 
+    
+    conducteur <- d1[lst_indice[l]:lst_indice[l+1]-1,]
+    for (i in 1: nrow(d2)) { # boucle sur les panneaux
+      data_util <- conducteur[( ((d2$dis_cum_VMA[i]-100) < conducteur$Odometre_Pk) & (conducteur$Odometre_Pk< (d2$dis_cum_VMA[i]+100)) ),]
+      if (dim(data_util)[1] != 0) {
+        distance2 <- distm (c(d2$Longitude[i],d2$Latitude[i]),cbind(data_util$GPS_Longitude,
+        data_util$GPS_Latitude), fun = distHaversine)
+        min_dist <- min(distance2)
+        indice <- which(distance2==min_dist)
+        # on ajoute la VMA au conducteur
+        conducteur$SpeedLimit[(conducteur$Odometre_Pk==data_util$Odometre_Pk[indice])] <- d2$SpeedLimit[i]
+      }
+    }
+  # il prend les indices des distances les plus courtes et il les place dans les vectrices liste_vitesse qui # contiennent les NA
+   setTxtProgressBar(pb, l)
+   
+  conducteur$SpeedLimit <- na.locf(conducteur$SpeedLimit,fromLast=F,na.rm=F) # Complète les NA par la VMA d'avant
+  conducteur$SpeedLimit <- na.locf(conducteur$SpeedLimit,fromLast=T,na.rm=F) # Complète les NA par l'arrière
+  
+  d <- bind_rows(d,conducteur)
+} 
+  return(d)
+}
+data_Expe03 <-colonne_VMA(data_Expe03, liste_SpeedLimit_Expe03I)
+```
+
+Au total `r ncol(data_Expe03)` variables pour `r nrow(data_Expe03)` enregistrements. Voici la forme du jeu de données que nous allons traiter (10 lignes aléatoires sélectionnées) 
+
+```{r}
+kable(sample_n(data_Expe03, 10), "latex", booktabs = T, linesep = "") %>%
+  kable_styling(position = "center",latex_options = "HOLD_position")
+```
+
+
+# ****************************************************************************************************************
+# ****************************************************************************************************************
+
+\newpage
+ **Ronnomage des données pour l'exécution dirrecte des fonctions **
+
+```{r}
+colnames(data_Expe03) <- c("DriverID", "InstantSpeed_CAN", "Timestamp","Distance_cum",
+                           "Latitude", "Longitude", "NumRecord", "SpeedLimit")
+```
+
+```{r, echo = F}
+liste_infra3 <- liste_infra_Expe03
+data <- data_Expe03
+data$DriverID <- factor(data$DriverID)
+```
+
+Dans cette experience chaque conducteur réalise un seul tour du circuit, on crée une colonne **Tripnumber**.
+
+```{r, results = 'hide'}
+Colonne_Tripnumber <- function(data) {
+  retour <- c()
+  for (i in unique(data$DriverID)) {
+    d <- subset(data, DriverID == i)
+    fin <- 2
+    debut <- 1
+    trip <- 1
+    while (fin <= length(d$NumRecord)) {
+      if (d$NumRecord[fin] == 1) {
+        retour <- c(retour, rep(trip, ((fin) - debut)))
+        debut <- fin
+        trip <- trip + 1
+      } else if (fin == length(d$NumRecord)) {
+        retour <- c(retour, rep(trip, ((fin) - debut) + 1))
+      }
+      fin <- fin + 1
+    }
+  }
+  return(retour)
+}
+
+data$Tripnumber <- Colonne_Tripnumber(data)
+```
+
+\newpage
+# Récupération des phases de décélération
+
+Nous allons maintenant procéder à l'extraction des décélérations dans notre jeu de données. Pour ce faire, nous avons choisi une définition d'un arrêt comme suit : le véhicule doit rester sous un seuil de vitesse de 5km/h avec un temps d'arrêt d'au moins 3 secondes pour constituer un arrêt.
+
+Lorsqu'un arrêt est detecté, on récupère les informations 50 mètres avant le premier point d'arrêt.
+
+Dans un premier temps, on crée une colonne composée de 1 lors des arrêts et de 0 sinon.
+```{r, warning = FALSE, message = FALSE, results = 'hide'}
+Colonne_Unzero <- function(d, seuilvitesse, temps){
+  phases <- d %>%
+  dplyr::mutate(DriverID, "arret" = 0)
+  tempsarret <- temps * 10
+  i<-1
+  while (i < (length(d$DriverID) - tempsarret)) {
+    # Detecter le début d'un arrêt
+    if (d$InstantSpeed_CAN[i] < seuilvitesse) {
+      ligArret <- i
+      # Parcours des durée et longueur de l'arrêt
+      while ((d$InstantSpeed_CAN[ligArret] < seuilvitesse) & (ligArret < length(d$DriverID))){
+        ligArret <- ligArret + 1
+      }
+      # Arrêt détecté (+ de 3 secondes)
+      if ((ligArret - i) >= tempsarret) {
+        # 1 dans le colonne arret sur tout l'arrêt
+          phases$arret[i:ligArret] <- 1
+          i <- ligArret + 1
+      } else {
+        i <- ligArret + 1
+      }
+    }
+    else {
+      i <- i + 1
+    }
+  }
+  return(phases)
+}
+```
+
+**Fonction de récupération des phases de décélération : **
+
+Cette fonction se sert de la colonne créée dans la partie précédente. Lorsque l'on détecte un arrêt selon ces critères, on vérifie qu'il n'y ait pas d'arrêts dans les 50 mètres le précédant pour éviter les superpositions de courbes.
+
+```{r}
+Get_Decelerations <- function(d, distance_avant) {
+  phases <- subset(d,DriverID == "0")
+  i <- 2
+  Decel_Id <- 0
+  Id_Decel <- c()
+  while(i<length(d$DriverID)){
+    # Detecter un arrêt
+    if (d$arret[i] == 1) {
+      distcumavant <- 0
+      lig_avant <- i - 1
+      lig_arret <- i
+      estComplet <- T
+      # Parcours des 50m avant l'arrêt
+      while ((distcumavant <= distance_avant) & (estComplet) & (lig_avant > 1)){
+        # Si on rencontre un arrêt dans ces 50m, on ne récupère pas les informations
+        if (d$arret[lig_avant] == 1) {
+          estComplet <- F
+        } else {
+          distcumavant = distcumavant + (d$Distance_cum[lig_avant] - d$Distance_cum[lig_avant - 1])
+          lig_avant <- lig_avant - 1
+        }
+      }
+      # Récupération des 50m
+      if (estComplet & (distcumavant >= distance_avant)) {
+        Decel_Id <- Decel_Id + 1
+        phases <- rbind(phases,d[((lig_avant + 1) : i),])
+        Id_Decel <- c(Id_Decel, rep(Decel_Id, (i - lig_avant)))
+      }
+      i <- lig_arret + 1
+    } else {
+      i <- i + 1
+    }
+  }
+  df <- data.frame(Decel_Id = Id_Decel)
+  phases <- cbind(phases,df)
+  return (phases)
+}
+```
+
+
+**Réunification des 2 fonctions précédentes par conducteur et par tour : **
+
+```{r, warning = FALSE, message = FALSE, results = 'hide'}
+Get_All_Decelerations <- function(d, distance_avant, seuil_vitesse, temps) {
+  retour <- subset(d,DriverID == "0")
+  listeConducteurs <- unique(d$DriverID)
+  nbTrip <- 0
+  compteur <- 0
+  # Calcul du nombre d'itérations
+  for (nb in listeConducteurs) {
+    nbTrip <- nbTrip + length(unique(d[d$DriverID == nb,]$Tripnumber))
+  }
+  pb <- txtProgressBar(min = 1, max = nbTrip , style = 3)
+  # Par conducteur
+  for (i in listeConducteurs) {
+    listeTrip <- unique(subset(d, DriverID == i)$Tripnumber)
+    # Par trip
+    for (j in listeTrip) {
+      compteur <- compteur + 1
+      data <- subset(d, DriverID == i & Tripnumber == j)
+      data <- Colonne_Unzero(data, seuil_vitesse, temps)
+      retour <- rbind(retour, Get_Decelerations(data, distance_avant))
+      setTxtProgressBar(pb, compteur)
+    }
+  }
+  return (retour)
+}
+```
+
+Choix des seuils dans la fonction :
+
+Récupération des 50 mètres avant l'arrêt
+Pas de récupération après l'arrêt
+5km/h pendant au moins 3 secondes pour détecter un arrêt
+
+```{r, results = 'hide'}
+decelerations <- Get_All_Decelerations(data, 50, 5, 3)
+```
+
+\newpage
+# Enrichissement des données
+
+**Normalisation des variables de distance et de temps pour chaque décélération : **
+
+```{r}
+Normalisation <- function(d) {
+  retour <- d %>% 
+    dplyr::group_by(Decel_Id, Tripnumber, DriverID) %>%
+    dplyr::mutate(
+    time_norm = (as.numeric(Timestamp) - last(as.numeric(Timestamp))),
+    dist_norm = (as.numeric(Distance_cum) - last(as.numeric(Distance_cum)))
+  ) %>%
+  ungroup()
+  return(retour)
+}
+
+decelerations <- Normalisation(decelerations)
+decelerations$time_norm <- decelerations$time_norm/1000
+```
+
+Nous nous basons sur la distance cumulée et l'heure pour detecter les distances que parcourent les conducteurs et le temps qu'ils prennent.
+Pour chaque décélération, on normalise ses valeurs de distance et de temps pour que chaque profil possède les mêmes grandeurs de valeurs. Pour ce faire, on soustraie la dernière valeur de temps et de distance cumulée à chaque profil. Toutes les distances sont désormais comprises entre -50 et 0 mètres.
+
+**Nouvelle colonne des Id des décélérations :**
+
+```{r}
+Unique_Decel_Id <- function(d) {
+  options(dplyr.summarise.inform = FALSE)
+  # Compte le nombre d'enregistrements par ligne
+  comptage <- d %>%
+    dplyr::group_by(DriverID, Tripnumber, Decel_Id) %>%
+    summarise(nb = n()) %>%
+    ungroup()
+  Decel_Id <- c()
+  # Id unique pour chaque décélération
+  for (i in 1:length(comptage$DriverID)) {
+    Decel_Id <- c(Decel_Id, rep(i,comptage$nb[i]))
+  }
+  return(Decel_Id)
+}
+decelerations <- arrange(decelerations, DriverID)
+decelerations$Decel_Id <- Unique_Decel_Id(decelerations)
+```
+
+Ces fonctions nous ont permis de récupérer et stocker `r length(unique(decelerations$Decel_Id))` profils de décélérations au total. Nous pouvons maintenant procéder au nettoyage des données.
+
+\newpage
+# Nettoyage des données 
+
+**Suppression des décélérations qui possèdent des erreurs de capteurs**
+
+Dans un premier temps, on vérifie que la distance cumulée et le timestamp soient bien constamment croissants. 
+
+```{r}
+Suppression_Aberrant_Values <- function(d) {
+  liste_id <- d %>% group_by(Decel_Id) %>%
+    summarise(est_croissant_dist = all(Distance_cum == cummax(Distance_cum)),
+              est_croissant_time = all(Timestamp == cummax(Timestamp))
+              ) %>%
+    # Filtre des décélérations remplissant les 3 conditions
+    filter(est_croissant_dist & est_croissant_time) %>%
+    ungroup()
+  return (filter(d, Decel_Id %in% liste_id$Decel_Id))
+}
+
+decelerations1 <- Suppression_Aberrant_Values(decelerations)
+```
+
+On passe à `r length(unique(decelerations1$Decel_Id))` décélérations.
+
+**Suppression des décélérations "zig-zag" : qui contiennent des baisses puis hausses de vitesse**
+
+Nous avons choisi ici d'enlever les décélérations qui contiennent des accélérations trop importantes.. Ce critère permet de garder uniquement les décélérations où la vitesse décroît - quasiment - constamment, les profils qui décélèrent puis ré-accélèrent en restant à une faible vitesse ne sont pas pertinents pour repondre à notre problématique.
+
+Nota bene : Il sera pertinent de refaire ce nettoyage sur les données interpolées, car cette fonction se sert de la différence de vitesse entre les points deux à deux pour pouvoir trier. Or, les décélérations brutes contenant plus d'enregistrements - donc plus denses - la différence entre deux points pendant une forte augmentation de vitesse peut rester petite, ce qui peut fausser la sélection.
+
+```{r}
+Remove_Positive_Acceleration <- function(d, seuil_diff) {
+  res <- c()
+  liste_id <- d %>%
+    group_by(Decel_Id) %>%
+    summarise(max = max(diff(InstantSpeed_CAN))) %>%
+    filter(max > seuil_diff) %>%
+     dplyr::select(Decel_Id)
+
+  return(subset(d, !(Decel_Id %in% liste_id$Decel_Id)))
+}
+
+decelerations2 <- Remove_Positive_Acceleration(decelerations1, 0.4)
+```
+
+Ce nettoyage enlève `r (length(unique(decelerations1$Decel_Id)) - length(unique(decelerations2$Decel_Id)))` profils. Cela nous fait passer à `r length(unique(decelerations2$Decel_Id))` décélérations.
+
+
+**Suppression des courbes toutes droites**
+
+On supprime les courbes droites qui sont le résultat de trous d'informations par les capteurs. Ces trous ont été complétés en reliant les points d'extrémités par des droites, ce qui ne représente pas des informations pertinentes à analyser dans notre projet, puisqu'elles ne sont pas représentatives de la réalité.
+
+```{r}
+Remove_Droite <- function(d, seuil){
+  d1 <- subset(d, (dist_norm < (-40) & (dist_norm >= (-50))))
+  d2 <- subset(d, (dist_norm < (-30) & (dist_norm >= (-40))))
+  d3 <- subset(d, (dist_norm < (-20) & (dist_norm >= (-30))))
+  d4 <- subset(d, (dist_norm < (-10) & (dist_norm >= (-20))))
+  d5 <- subset(d, (dist_norm < (0) & (dist_norm >= (-10))))
+  res <- c()
+  list <- list(d1, d2, d3, d4, d5)
+  id_decel <- unique(d$Decel_Id)
+  for (j in list) {
+    for (i in id_decel){
+      decel_a_trier <- subset(j, Decel_Id == i)
+      # On centre les valeurs d'accélération par décélération 
+      vect <- diff(decel_a_trier$InstantSpeed_CAN) - mean(diff(decel_a_trier$InstantSpeed_CAN))
+      # Si une valeur dépasse le seuil, différence trop importante pour être une droite
+      if (max(vect) > seuil) res <- c(res, i)
+    }
+  }
+  return(subset(d, (Decel_Id %in% subset(as.data.frame(table(res)), Freq >= 4)$res) &
+                  dist_norm >= -50))
+}
+
+decelerations3 <- Remove_Droite(decelerations2, 0.05)
+decelerations3$Decel_Id <- Unique_Decel_Id(decelerations3)
+```
+
+
+
+
+
+
+Avec ces trois nettoyages, on dispose désormais de `r length(unique(decelerations3$Decel_Id))` décélérations réalisées par `r length(unique(decelerations$DriverID))` conducteurs différents. 
+
+\newpage
+Voici un échantillon des décélérations de 3 conducteurs sur 3 tours pour mieux visualier ces extractions :
+
+Les accélérations (courbe qui "monte") qu'on peut voir nottament dans les deux premiers graphiques seront retirées lors du nettoyage avec les données interpolées. 
+
+On retrouve en ligne 3 conducteurs différents, avec pour chacun d'entre eux les décélérations de leur 3 premiers tours, en colonne. Pour chaque graphique, l'axe des abscisses correspond à la distance avant l'arrêt (va de -50 mètres à 0) ; l'axe des ordonnées correspond à la valeur de la vitesse en km/h.
+
+
+```{r, fig.width = 13, fig.height = 13, echo = FALSE}
+ggplot(data = subset(decelerations3, DriverID %in% c("4E38P","6K29O","6LI21") & Tripnumber %in% c(1:3))) + geom_jitter(mapping = aes(x = dist_norm, y= InstantSpeed_CAN, colour = DriverID), show.legend = F) +
+  facet_grid(rows = vars(DriverID), cols = vars(Tripnumber)) +
+  labs(x = "Distance (m)", y = "Vitesse (km/h)") +
+  ggtitle("Décélérations par conducteur et par tour après nettoyage") + 
+  theme(plot.title = element_text(size=22))
+```
+
+\newpage
+Pour mieux visualiser le nettoyage des données, voici un zoom sur les décélérations du premier tour d'un conducteur choisi au hasard.
+
+```{r, fig.width=10, fig.height=6, echo = FALSE, warning = FALSE, message = FALSE}
+Plot_Nettoyage <- function(id, trip) {
+  d1 <- ggplot() + geom_point(data = subset(decelerations,(dist_norm > -50) & (dist_norm < 0) & (DriverID == id) & Tripnumber == trip), mapping = aes(x = dist_norm, y= InstantSpeed_CAN), colour = "red3") + ggtitle("Décélérations totales") + labs(x = "Distance (m)", y = "Vitesse (km/h)")
+  
+  d2 <- ggplot() + geom_point(data = subset(decelerations1,(dist_norm > -50) & (dist_norm < 0) & (DriverID == id) & Tripnumber == trip), mapping = aes(x = dist_norm, y= InstantSpeed_CAN), colour = "darkorange3") + ggtitle("Distance cumulée et timestamp toujours croissants") + labs(x = "Distance (m)", y = "Vitesse (km/h)")
+  
+  d3 <- ggplot() + geom_point(data = subset(decelerations2,(dist_norm > -50) & (dist_norm < 0) & (DriverID == id) & Tripnumber == trip), mapping = aes(x = dist_norm, y= InstantSpeed_CAN), colour = "orange2") + ggtitle("Accélération toujours inférieure à 0,35") + labs(x = "Distance (m)", y = "Vitesse (km/h)")
+  
+  d4 <- ggplot() + geom_point(data = subset(decelerations3,(dist_norm > -50) & (dist_norm < 0) & (DriverID == id) & Tripnumber == trip), mapping = aes(x = dist_norm, y= InstantSpeed_CAN), colour = "gold2") + ggtitle("Suppression des droites") + labs(x = "Distance (m)", y = "Vitesse (km/h)")
+  
+  return(grid.arrange(d1,d2,d3,d4,ncol = 2, nrow = 2))
+}
+```
+
+On retrouve 4 graphiques, qui correspondent aux décélérations sélectionnées après chaque étape de nettoyage, nommée en titre. 
+Dans le deuxième graphique, on a gardé les courbes dont la distance cumulée et le timestamp sont croissants. 
+Dans le troisième, on a gardé les courbes du deuxième graphique, et on a retiré les courbes qui ont de trop fortes valeurs d'accélération.
+Dans le quatrième, on a gardé les courbes du troisième graphique, puis supprimé les droites.
+
+```{r, fig.width=14, fig.height=10, echo = FALSE, warning = FALSE, message = FALSE}
+Plot_Nettoyage("6LI21",1)
+```
+
+\newpage
+# Recherche de l'infrastructure qui a causé l'arrêt
+
+L'objectif de cette partie est d'associer chaque décélération à l'infrastructure qui l'aurait causée, dans le but d'étudier d'éventuelles différences significatives entre les types de freinage selon l'environnement responsable de l'arrêt.
+
+Tout d'abord, on récupère les coordonnées geographiques de chaque point d'arrêt :
+
+```{r}
+coord_points_arret <- decelerations3 %>% 
+  dplyr::group_by(Decel_Id) %>%
+  dplyr::mutate(Latitude_Point_Arret = last(Latitude), 
+         Longitude_Point_Arret = last(Longitude)
+         ) %>%
+  dplyr::select(Decel_Id, Latitude_Point_Arret, Longitude_Point_Arret) %>%
+  unique() %>%
+  ungroup()
+```
+
+Pour chaque point d'arrêt, on cherche les infrastructures présentes 15 mètres autour de ce point.
+
+```{r, results = 'hide'}
+Causes_Of_Deceleration <- function(df_decel, df_infra, rayon_autour) {
+  retour <- data.frame(Decel_Id = c(), Distances = c(), Cause_Decel = c())
+  liste_decel_id <- unique(df_decel$Decel_Id)
+  pb <- txtProgressBar(min = 1, max = length(liste_decel_id), style = 3)
+  for (i in (1:length(liste_decel_id))) {
+    dat <- df_decel[i,]
+    infras_retenues <- c()
+    lat <- dat$Latitude_Point_Arret
+    long <- dat$Longitude_Point_Arret
+    
+    #Calcul de toutes les distances entre le point d'arrêt et les infrastructures
+    for (j in (1:length(df_infra$Latitude))) {
+      dist <- distGeo(c(long, lat), c(df_infra$Longitude[j], df_infra$Latitude[j]))
+      #Infrastructures dans le rayon autour de la voiture
+      if (dist <= rayon_autour) {
+        infras_retenues <- c(infras_retenues, liste_infra3$Infra[j])
+      }
+    }
+    lig_a_inserer = data.frame(dat$Decel_Id, Multiple_To_One_Cause(infras_retenues))
+    retour <- rbind(retour, lig_a_inserer)
+    setTxtProgressBar(pb, i)
+  }
+  names(retour) <- c("Decel_Id","Cause_Decel")
+  return(retour)
+}
+```
+
+Pour gérer les endroits où on trouve plusieurs infrastructures, on répertorie chacun des "groupes d'infrastructures" repérés à un même endroit. On fait ensuite correspondre à chacun de ces groupes l'infrastructure unique la plus probable qui aurait provoqué l'arrêt.
+
+Voici la règle de décision que nous avons élaborée pour choisir une unique infrastructure responsable d'un arrêt :
+
+```{r}
+#![Règles de décision](../Annexes et documentation/regle_decision.png)
+```
+
+
+Pour chaque environnement qui comporte plus d'une infrastructure, on parcours ce tableau de haut en bas et de droite à gauche à chaque niveau :
+
+La première infrastructure en commun avec l'environnement sera la cause de l'arrêt. Si on ne rencontre aucune infrastructure dans le rayon de 20 mètres autour de l'arrêt, on met "NA" en cause de la décélération. Cette méthode permet donc d'évaluer la cause la plus probable d'un arrêt.
+
+Voici deux exemples concrets pour illustrer ces règles de décision :
+- On trouve un panneau stop et un arrêt de bus au même endroit. La cause de la décélération sera le stop puisqu'il est certain que l'usager se soit arrêté pour cette raison et non pour l'arrêt de bus qui est une raison seulement probable.
+- On trouve un rond point et un passage piéton au même endroit. La cause de la décélération sera le rond point pour les mêmes raisons ci-dessus.
+
+
+```{r, results = 'hide'}
+Multiple_To_One_Cause <- function(infras_retenues){
+  liste <- c("T", "SC", "PP", "AB", "FT", "X", "RP", "PI", "PN", "PS", "VD", "VF")
+  i <- 1
+  est_dedans <- F
+  if (length(infras_retenues) != 0) {
+    while (!est_dedans) {
+      if (liste[i] %in% infras_retenues) {
+        est_dedans <- T
+        return (liste[i])
+      }
+      i <- i + 1
+    }
+  }
+  return("NA")
+}
+
+env_autour_arret <- Causes_Of_Deceleration(coord_points_arret, liste_infra3, 20)
+```
+
+On peut désormais visualiser le nombre de décélérations selon le type d'infrastructure.
+
+```{r, echo = FALSE, fig.width=10, fig.height=6}
+table_pour_geombar <- as.data.frame(sort(table(env_autour_arret$Cause_Decel), decreasing = T))
+names(table_pour_geombar) <- c("Cause_Decel","Nb")
+
+ggplot(table_pour_geombar, aes(x = Cause_Decel, y = Nb, fill = Cause_Decel)) +
+  geom_bar(stat = "identity", show.legend = F) +
+  geom_text(aes(label = Nb), vjust=-0.5, color = "black", size=4) +
+  labs(x = "Environnement qui a causé la décélération", y = "Nombre", title = "Nombre de décélérations selon le type d'infrastructure")
+```
+
+Ajout d'informations intrinsèques de chaque décélération :
+
+- Vitesses de départ et d'arrivée
+- Durée de la décélération
+- Identifiant conducteur
+- Variabilité de la vitesse (km/h / s)
+- Limitation de vitesse
+
+```{r, warning = FALSE, message = FALSE}
+infos_sup_decelerations <- decelerations3 %>% 
+  dplyr::group_by(Decel_Id) %>%
+  dplyr::mutate(Vitesse_Depart = first(InstantSpeed_CAN),
+         Vitesse_Arrivee = last(InstantSpeed_CAN),
+         Duree = -(first(time_norm)),
+         Variabilite_Vitesse = (Vitesse_Depart - Vitesse_Arrivee) / Duree, 
+         Limitation_Vitesse = first(SpeedLimit), 
+         ) %>%
+  dplyr::select(Decel_Id, Vitesse_Depart, Vitesse_Arrivee, Duree,
+         Variabilite_Vitesse, Limitation_Vitesse) %>%
+  unique() %>%
+  left_join(env_autour_arret, by = "Decel_Id") %>%
+  ungroup()
+```
+
+Voici la structre du tableau obtenu, qui contient une ligne par décélération accompagnée des informations supplémentaires énumérées ci-dessus (10 lignes aléatoires) :
+
+```{r, echo = FALSE}
+kable(sample_n(subset(infos_sup_decelerations, Cause_Decel != "NA"), 10), "latex", booktabs = T, linesep = "") %>%
+  kable_styling(position = "center", bootstrap_options = c("striped", "hover"))
+```
+
+On ajoute ces informations par jointure à notre fichier de décélérations nettoyées.
+
+```{r, warning = FALSE, message = FALSE}
+decelerations3 <- decelerations3 %>%
+  left_join(infos_sup_decelerations, by = "Decel_Id")
+```
+
+Nous disposons désormais de l'infrastructure qui a causé le freinage pour `r round((1 - filter(table_pour_geombar, Cause_Decel == "NA")$Nb / sum(table_pour_geombar$Nb)) * 100, 1)`% des décélérations.
+
+\newpage
+# Interpollation et ré-échantillonage
+
+On interpolle chaque décélération pour alléger le jeu de données et lisser les courbes. Nous choisissons ici une valeur de 50 points par décélération, donc 1 point par mètre.
+
+```{r, results = 'hide'}
+Interpolation <- function(d, nb_points) {
+  compteur <- 0
+  Liste_Decel <- unique(d$Decel_Id)
+  Speed <- NULL
+  Time <- NULL
+  Distance <- NULL
+  Decel_Id <- NULL
+  Total_Courant <- NULL
+  decelerations_interpolees <- NULL
+  pb <- txtProgressBar(min = 1, max = length(Liste_Decel), style = 3)
+  for (i in Liste_Decel) {
+    compteur <- compteur + 1
+    datad <- subset(d, (Decel_Id == i))
+    # Nouvelle base sur 50 points : 1 point par mètre
+    sequence <- seq(-nb_points, 0, 1)
+    ## Lissage de la vitesse
+    xy.spl <- smooth.spline(datad$dist_norm, datad$InstantSpeed_CAN,
+                            spar=0.3, control.spar = list(), tol = 0.0001)
+    xyf <- splinefun(xy.spl, method="natural")
+    newspeed <- xyf(sequence)
+    ## Lissage du temps
+    xy.spl <- smooth.spline(datad$dist_norm, datad$time_norm,
+                            spar=0.3, control.spar = list(), tol = 0.0001)
+    xyf <- splinefun(xy.spl, method="natural")
+    newtime <- xyf(sequence)
+    ## Création des colonnes
+    Speed <- as.data.frame(newspeed)
+    Time <- as.data.frame(newtime)
+    Distance <- as.data.frame(sequence)
+    Decel_Id <- as.factor(rep(i, dim(Speed)[1]))
+    Infrastructure <- as.factor(rep(unique(datad$Cause_Decel), dim(Speed)[1]))
+    ## Création du dataframe courant
+    Total_Courant <- data.frame(cbind(Decel_Id, Speed, Time, Distance, Infrastructure))
+    names(Total_Courant)[1:5] <- c("Decel_Id", "Speed", "Time", "Distance", "Infrastructure")
+    ## Concaténation dans le dataframe final
+    decelerations_interpolees <- rbind(decelerations_interpolees, Total_Courant)
+    setTxtProgressBar(pb, compteur)
+  }
+  return(decelerations_interpolees)
+}
+
+decelerations_interpolees <- Interpolation(decelerations3, 50)
+```
+
+Voici la structre du fichier des données interpolées (on sélectionne les 10 premières lignes) :
+
+```{r, echo = FALSE}
+kable(slice(decelerations_interpolees, 1:10), "latex", booktabs = T) %>%
+  kable_styling(position = "center")
+```
+
+Pour vérifier que l'interpollation est bien représentative, on peut superposer un échantillon aléatoire de profils de décélération avec leur propre profil interpollé. 
+
+En orange les décélérations brutes, en bleu leur décélération interpolée respective. On remarque que la fréquence de points reste à peu près fidèle dans les 30 premiers mètres, c'est surtout dans les derniers mètres que le nombre de points s'allège tout en restant parfaitement représentatif.
+
+```{r, fig.width = 12, fig.height = 8, echo = FALSE}
+random_4_curves <- sample(1:nrow(env_autour_arret), 4)
+ggplot() +
+  geom_point(data = subset(decelerations3, Decel_Id %in% random_4_curves), aes(x = dist_norm, y= InstantSpeed_CAN), colour = "orange2") +
+  geom_point(data = subset(decelerations_interpolees, Decel_Id %in% random_4_curves), aes(x = Distance, y= Speed), colour = "blue3", alpha = 0.7) +
+  facet_wrap(~Decel_Id,) +
+  labs(x = "Distance (m)", y = "Vitesse (km/h)") +
+  ggtitle("Profils de décélération bruts superposés avec leur profil interpolé") + 
+  theme(plot.title = element_text(size=22))
+```
+
+
+**Second nettoyage : Vérification qu'aucune différence de vitesse entre deux points soit supérieure à 0.2**
+
+Comme expliqué dans la première partie, on refait ce nettoyage avec les données interpolées pour retirer les dernières courbes qui contenaient trop de points pour être considérées comme non pertinentes.
+
+```{r}
+Remove_Positive_Acceleration <- function(d, seuil_diff) {
+  res <- c()
+  liste_id <- d %>%
+    group_by(Decel_Id) %>%
+    summarise(max = max(diff(Speed))) %>%
+    filter(max > seuil_diff) %>%
+    dplyr::select(Decel_Id)
+  return(subset(d, !(Decel_Id %in% liste_id$Decel_Id)))
+}
+
+decelerations_interpolees <- Remove_Positive_Acceleration(decelerations_interpolees, 0.25)
+```
+
+Cela nous fait passer à `r length(unique(decelerations_interpolees$Decel_Id))` décélérations.
+
+
+**Choix des infrastructures à modéliser :**
+
+Nous effectueront les modélisations polynomiales sur les décélérations où la limite de vitesse est de 50 km/h et pour les infrastructures qui ont suffisamment de profils, afin que leur modélisation soit pertinente. On garde les 6 infrastructures suivantes : **feu tricolore**, **passage piéton**,et les valeurs manquantes **NA**.
+
+```{r}
+decelerations_interpolees_a_modeliser <- filter(
+  filter(decelerations_interpolees,
+         Decel_Id %in% filter(infos_sup_decelerations,
+                              Limitation_Vitesse == 50)$Decel_Id),
+  Infrastructure %in% c("PP","FT", "NA"))
+
+#Remise à 0 des Decel_Id - va de 1 au nombre de décélérations
+decelerations_interpolees_a_modeliser$Decel_Id <- sort(
+  rep(seq(1,length(unique(decelerations_interpolees_a_modeliser$Decel_Id))),51))
+decelerations_interpolees_a_modeliser$Infrastructure <- 
+  factor(decelerations_interpolees_a_modeliser$Infrastructure)
+```
+
+Au final, on a `r length(unique(decelerations_interpolees_a_modeliser$Decel_Id))` décélérations et `r length(unique(decelerations_interpolees_a_modeliser$Infrastructure))` infrastructures pour la partie modélisation.
+
+```{r, fig.width = 10, fig.height = 8, echo = FALSE}
+ggplot(data = decelerations_interpolees_a_modeliser) +
+  geom_point(mapping = aes(x = Distance, y= Speed, colour = Infrastructure), show.legend = FALSE) +
+  facet_wrap(~Infrastructure) +
+  labs(x = "Distance (m)", y = "Vitesse (km/h)") +
+  ggtitle("Profils de décélérations interpolées par infrastructure") + 
+  theme(plot.title = element_text(size=22))
+```
+
+Dont voici les effectifs par infrasctructure
+```{r}
+table_des_effectifs <- as.data.frame(sort(table(decelerations_interpolees_a_modeliser$Infrastructure)/51), decreasing = T)
+names(table_des_effectifs) <- c("Infrastructure","Effectif")
+kable(table_des_effectifs, "latex", booktabs = T, linesep = "") %>%
+  kable_styling(position = "center", bootstrap_options = c("striped", "hover"))
+```
+
+\newpage
+# Description et Modélisation
+
+## Description
+
+Le but de cette partie est de repérer des différences significatives entre les types de freinage selon l'infrastructure.
+Nous allons dans un premier temps modéliser les décélérations par infrastructure individuellement, puis dans un second temps, nous modéliserons les décélérations avec toutes les modalités d'infrastructures.
+
+Pour commencer, on affiche tous les profils de décélération par infrastructure pour visualiser leurs moyenne et intervalle de confiance respectifs.
+
+```{r, warning = FALSE, message = FALSE, fig.width = 15, fig.height = 10}
+Affichage_Courbe_Moyenne <- function(type){
+  traj <- subset(decelerations_interpolees_a_modeliser, Infrastructure == type)
+  length(unique(traj$Decel_Id))
+#qplot(data=traj, x=Distance, y=Speed, geom='line', group=Decel_Id)
+
+  traj_summary <- data.frame(Distance=traj$Distance,
+                             n=tapply(traj$Speed,
+                                      traj$Distance,
+                                      length),
+                             mean=tapply(traj$Speed, traj$Distance, mean))
+  # This will generate a df_summary dataframe that has the
+  # average signal and the number of samples per time point.
+  # To add the standard deviation and standard error of the mean:
+  
+  traj_summary$sd <- tapply(traj$Speed, traj$Distance, sd)
+  traj_summary$sem <- traj_summary$sd/sqrt(traj_summary$n-1)
+  head(traj_summary)
+  # Finally, we add the lower and upper bound of the 95% confidence interval:
+  
+  traj_summary$CI_lower <- traj_summary$mean + qt((1-0.95)/2,
+                                                  df=traj_summary$n-1)*traj_summary$sem
+  traj_summary$CI_upper <- traj_summary$mean - qt((1-0.95)/2,
+                                                  df=traj_summary$n-1)*traj_summary$sem
+  
+  traj_summary <- traj_summary[1:length(unique(traj_summary$Distance)),]
+  
+  return (ggplot(traj_summary, aes(x=Distance, y=mean)) +
+    ylim(0,50) +
+    geom_line(data=traj, aes(x=Distance, y=Speed, group=Decel_Id), color="grey") +
+    geom_line(size=1, alpha=0.8) +
+    geom_ribbon(aes(ymin=CI_lower, ymax=CI_upper) ,fill="blue", alpha=0.2) +
+    ggtitle(type) +
+    xlab("Distance (m) à l'arrêt") + ylab("Vitesse (km/h)"))
+}
+```
+
+
+```{r, warning = FALSE, message = FALSE, fig.width=12, fig.height=18}
+d1 <- Affichage_Courbe_Moyenne("PP")
+d2 <- Affichage_Courbe_Moyenne("NA")
+d3 <- Affichage_Courbe_Moyenne("X")
+d4 <- Affichage_Courbe_Moyenne("T")
+d5 <- Affichage_Courbe_Moyenne("RP")
+d6 <- Affichage_Courbe_Moyenne("FT")
+
+
+grid.arrange(d1, d2, d3, d4, d5, d6,
+             ncol = 3, nrow = 2,
+             top = textGrob("Profils de décélérations par infrastructure avec intervalle de confiance",
+                            gp=gpar(fontsize=20)))
+```
+
+Les intervalles de confiance permettent de visualiser la confiance qu'on peut avoir pour la modélisation de chaque infrastructure.
+
+
+\newpage
+## Modélisation
+
+Le but de cette partie est tout d'abord de définir quelles modalités des infrastructures sont significatives et à quel degré.
+**Modélisation pour chaque type d'infrastructure**
+
+\center __Passage piéton__
+```{r}
+fit.lm.pp = lm(Speed ~ Distance + I(Distance^2) + I(Distance^3), 
+               data = subset(decelerations_interpolees_a_modeliser,
+                             Infrastructure == "PP"))
+
+kable(summary(fit.lm.pp)$coefficients, "latex", booktabs = T) %>%
+  kable_styling(position = "center", bootstrap_options = c("striped", "hover"))
+```
+
+
+\center __Arret de bus__
+```{r}
+fit.lm.ab = lm(Speed ~ Distance + I(Distance^2) + I(Distance^3), 
+               data = subset(decelerations_interpolees_a_modeliser,
+                             Infrastructure == "X"))
+
+kable(summary(fit.lm.ab)$coefficients, "latex", booktabs = T) %>%
+  kable_styling(position = "center", bootstrap_options = c("striped", "hover"))
+```
+
+\center__Feu tricolore__
+```{r}
+fit.lm.ft = lm(Speed ~ Distance + I(Distance^2) + I(Distance^3), 
+               data = subset(decelerations_interpolees_a_modeliser,
+                             Infrastructure == "FT"))
+
+kable(summary(fit.lm.ft)$coefficients, "latex", booktabs = T) %>%
+  kable_styling(position = "center", bootstrap_options = c("striped", "hover"))
+```
+
+
+
+\center __Infrastructure manquante__
+```{r}
+fit.lm.na = lm(Speed ~ Distance + I(Distance^2) + I(Distance^3), 
+               data = subset(decelerations_interpolees_a_modeliser,
+                             Infrastructure == "NA"))
+
+kable(summary(fit.lm.na)$coefficients, "latex", booktabs = T) %>% 
+  kable_styling(position = "center", bootstrap_options = c("striped", "hover"))
+```
+
+\center __Avec tous les environnements en même temps__ \center
+
+Pour cette modélisation, nous avons choisi que la modalité de référence soit "NA", soit les décélérations dont nous ne disposons pas d'information sur l'infrastructure. Les coefficient des autres infrastructures sont donc relatifs au coefficient de la modélisation des courbes "NA".
+
+```{r}
+fit.lm = lm(Speed ~ Distance*Infrastructure + I(Distance^2)*Infrastructure + I(Distance^3)*Infrastructure,
+            data = decelerations_interpolees_a_modeliser)
+
+kable(summary(fit.lm)$coefficients, "latex", booktabs = T, linesep = "") %>%
+  kable_styling(position = "center")
+```
+
+
+```{r, eval=TRUE, fig.width=12, fig.height=8, warning = FALSE, message = FALSE}
+fit.lm = lm(Speed ~ Distance*Infrastructure + I(Distance^2)*Infrastructure + I(Distance^3)*Infrastructure,
+            data = decelerations_interpolees_a_modeliser)
+
+interact_plot(fit.lm,
+              pred = Distance,
+              modx = Infrastructure,
+              interval = TRUE,
+              int.width = 0.8,
+              main.title = "Superposition des 6 modélisations avec intervalles de confiance")
+```
+
+
+
+# Interprétation
+
+**Passages piétons et Arrêts de bus**
+On remarque que le profil de décélération pour les passages piéton possède une vitesse toujours inférieure à toutes les autres infrastructures. Cela semble logique puisque dans ce cas, le conducteur doit doubler de prudence et de vigilance, car un piéton peut décider de traverser brusquement à tout moment sans qu'on l'ait prémédité ou simplement vu. Le conducteur reste donc à une vitesse plus faible pour pouvoir freiner à temps. Ce comportement paraît semblable pour le cas des arrêts au niveau d'un arrêt de bus. Les bus pouvant d'une part freiner sèchement pour déposer des voyageurs, puis également pour rester vigilant sur les voyageurs traversant la route directement après être descendus, sans qu'on les voie cachés derrière le bus.
+
+**Feux tricolores**
+(?? Toutes les pvalue >> 0.05 à part Distance*FT = 0.03 ??)
+La vitesse moyenne des arrêts pour les feux tricolores est la plus élevée par rapport aux autres. Généralement, lorsqu'un feu est vert, on a la priorité sur tous les autres usagers de la route, on approche donc ce type d'infrastructure avec confiance et donc une vitesse plus élevée. Cependant, il est courant de se laisser surprendre par un feu tricolore qui passe au orange lorsqu'on l'approche, ce qui entraine un ralentissement plus brutal. C'est ce qu'on observe sur la modélisation concernée. On remarque que la vitesse réduit plus rapidement que les autres à partir de 25 mètres avant l'arrêt.
+
+**Ronds-points et Panneaux stop**
+Les vitesses d'approche pour ces deux types d'infrastructure sont moyennes de 50 à 30 mètres avant l'arrêt par rapport aux autres. Cependant, elles deviennent les plus élevées après cette période. Etant sûr que l'on va devoir s'arrêter pour ces deux cas, les conducteurs semblent approcher avec moins de prudence pour freiner plus intensément sur les 15 derniers mètres.
