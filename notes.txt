@@ -1,0 +1,332 @@
+```{r}
+#
+ODOMETER_VMA <- c(83.6, 750, 2037, 2425, 3479, 3795, 4227, 5795, 
+       2931.8, 4170.7, 4973, 6203.7, 
+       4459.5, 4972.8, 6382,
+       3822.9, 5208.3, 5561.1,
+       2758.7, 2850.7, 5041,
+       320.1, 625.6, 1271.4, 1656.2, 5444.4, 5500.4, 5855.9, 6145.6,
+       103.1, 1909.5, 2090.1, 2381, 3730.6, 4859, 4986.1,
+       5370.6, 6150.1, 6245.2,
+       215.4, 1075.6, 3983.5, 4727, 4912.5, 5912.8,
+       3779.2, 5159.3, 6382.2,
+       540.2, 727.7, 888.1, 1936.8, 3886.3, 4524.7, 5230.9, 5527.4,
+       1704.6, 2430.5, 2640.9, 5080.3)
+```
+
+```{r}
+Distance_cum_VMA <- c(83.6, 750, 2037, 2425, 3479, 3795, 4227, 5795,
+       9482.5, 10721.4, 11523.7, 12754.4,
+       17563.7, 18077, 19486.2,
+       23480.6, 24866, 25218.8,
+       35523.4, 35615.4, 37805.7,
+       39638.3, 39943.8, 40589.6, 40974.4, 44762.6, 44818.6, 45174.1, 45463.8,
+       45974.8, 47781.2, 47961.8, 48252.7, 49602.3, 50730.7, 50857.8,
+       51242.3, 52021.8, 52116.9,
+       52640.6, 53500.8, 56408.7, 57152.2, 57337.7, 58338,
+       62757.9, 64138, 65360.9,
+       66072.4, 66259.9, 66420.3, 67469, 69418.5, 70056.9, 70763.1, 71059.6,
+       73790.3, 74516.2,74726.6, 77166)
+```
+
+```{r}
+liste_SpeedLimit_Expe01 <- bind_cols(liste_SpeedLimit_Expe01, ODOMETER_VMA, Distance_cum_VMA)
+```
+
+```{r}
+colnames(liste_SpeedLimit_Expe01) <- c("SpeedLimit","Latitude","Longitude","ODOMETER_VMA", "Distance_cum_VMA")
+```
+
+
+
+```{r}
+# entre ID 56 et 57
+# 55_F70_Rive_Droite         ODOMETER	805.6  Distance_cum	72891.3
+```
+# Conduceur 02
+
+1 100_50_NoSign    ODOMETER	83.6   Distance_cum	83.6                       
+2 1_90_TPC                  750                 750
+3 109_110_SignVisible       2037                2037
+4 5_110_BAU                 2425                2425
+5 6_70_BAU                  3479                3479
+6 110_110_SignVisible       3795                3795
+7 9_110_BAU                 4227                4227
+8 101_90_NoSign             5795                5795
+
+
+9 11_50_Rive_Droite                         ODOMETER	2931.8   Distance_cum	9482.5
+10 14_Agglo_Fin_Rive_Droite (La Poterie)    ODOMETER	4170.7   Distance_cum	10721.4
+11 11_50_Rive_Droite                        ODOMETER	4973     Distance_cum	11523.7
+12 14_Agglo_Fin_Rive_Droite (La Poterie)    ODOMETER	6203.7   Distance_cum	12754.4
+
+13 15_Agglo_DÃ©but_Rive_Droite (St-Julien)  ODOMETER	4459.5   Distance_cum	17563.7
+14 16_Agglo_Fin_Rive_Droite (St-Julien)     ODOMETER	4972.8   Distance_cum	18077
+15 17_Agglo_DÃ©but_Rive_Droite (St-Julien)  ODOMETER	6382     Distance_cum	19486.2
+
+
+16 19_70_rappel_Rive_Droite                 ODOMETER	3822.9   Distance_cum	23480.6
+17 23_Agglo_DÃ©but_Rive_Droite (Malakoff)   ODOMETER	5208.3   Distance_cum	24866
+18 24_Agglo_Fin_Rive_Droite (Malakoff)      ODOMETER	5561.1   Distance_cum	25218.8
+
+19 27_70_Rive_Droite                        ODOMETER	2758.7   Distance_cum	35523.4
+20 102_90_NoSign                            ODOMETER	2850.7   Distance_cum	35615.4
+21 28_90_rappel_Rive_Droite                 ODOMETER	5041     Distance_cum	37805.7
+
+22 29_50_Rive_Droite                        ODOMETER	320.1    Distance_cum	39638.3
+23 111_90_NoSign                            ODOMETER	625.6    Distance_cum	39943.8
+24 112_110_SignVisible                      ODOMETER	1271.4   Distance_cum	40589.6
+25 31_110_BAU                               ODOMETER	1656.2   Distance_cum	40974.4
+26 32_70_BAU                                ODOMETER	5444.4   Distance_cum	44762.6
+27 33_50_BAU                                ODOMETER	5500.4   Distance_cum	44818.6
+28 34_50_Rive_Droite                        ODOMETER	5855.9   Distance_cum	45174.1
+29 35_F50_Rive_Droite                       ODOMETER	6145.6   Distance_cum	45463.8
+
+
+30 37_Agglo_DÃ©but_Rive_Droite (Le CrÃ©ach) ODOMETER	103.1    Distance_cum	45974.8
+31 113_90_NoSign                            ODOMETER	1909.5   Distance_cum	47781.2
+32 39_70_Rive_Droite                        ODOMETER	2090.1   Distance_cum	47961.8   
+33 40_F70_Rive_Droite                       ODOMETER	2381     Distance_cum	48252.7
+34 41_Agglo_DÃ©but_Rive_Droite (Les CÃ´teaux) ODOMETER	3730.6  Distance_cum	49602.3
+35 42_20_Rive_Droite                          ODOMETER	4859    Distance_cum	50730.7
+36 103_50_NoSign                              ODOMETER	4986.1  Distance_cum	50857.8
+
+37 43_Agglo_Fin_Rive_Droite (Les CÃ´teaux)    ODOMETER	5370.6  Distance_cum	51242.3
+38 114_70_SignVisible                         ODOMETER	6150.1  Distance_cum	52021.8
+39 44_70_Rive_Droite                          ODOMETER	6245.2  Distance_cum	52116.9
+
+40 115_90_NoSign                              ODOMETER	215.4  Distance_cum	52640.6
+41 104_50_NoSign                              ODOMETER	1075.6 Distance_cum	53500.8
+42 45_Agglo_DÃ©but_Rive_Droite (PlÃ©dran)     ODOMETER	3983.5 Distance_cum	56408.7
+43 46_30_Rive_Droite                          ODOMETER	4727   Distance_cum	57152.2
+44 116_NoSign_50                              ODOMETER	4912.5 Distance_cum	57337.7
+45 47_Agglo_Fin_Rive_Droite (PlÃ©dran)        ODOMETER	5912.8 Distance_cum	58338
+
+46 48_50_Rive_Droite                          ODOMETER	3779.2 Distance_cum	62757.9
+47 105_90_NoSign                              ODOMETER	5159.3 Distance_cum	64138
+48 49_70_rappel_Rive_Droite                   ODOMETER	6382.2 Distance_cum	65360.9
+
+49 50_Agglo_DÃ©but_Rive_Droite (L'HÃ´pital)   ODOMETER	540.2  Distance_cum	66072.4
+50 51_30_Rive_Droite                          ODOMETER	727.7  Distance_cum	66259.9
+51 106_50_NoSign                              ODOMETER	888.1  Distance_cum	66420.3
+52 53_70_Rive_Droite                          ODOMETER	1936.8 Distance_cum	67469
+53 55_F70_Rive_Droite                         ODOMETER	3886.3 Distance_cum	69418.5
+54 56_30_Rive_Droite                          ODOMETER	4524.7 Distance_cum	70056.9
+55 107_70_NoSign                              ODOMETER	5230.9 Distance_cum	70763.1
+56 108_70_NoSign                              ODOMETER	5527.4 Distance_cum	71059.6
+
+57 58_Agglo_DÃ©but_Rive_Droite (La Croix Bertrand)  ODOMETER	1704.6  Distance_cum	73790.3
+58 60_30_Rive_Droite                                ODOMETER	2430.5  Distance_cum	74516.2
+59 62_70_Rive_Droite                                ODOMETER	2640.9  Distance_cum	74726.6
+60 66_Agglo_DÃ©but_Rive_Droite (TrÃ©gueux)          ODOMETER	5080.3  Distance_cum	77166
+##################################################################################################
+
+```{r}
+# la premiere partie de 1 -> 15034
+
+trace1 <- trace_S02[c(1:2500),]
+trace2 <- trace_S02[c(2501:5000),]
+trace3 <- trace_S02[c(5001:7500),]
+trace4 <- trace_S02[c(7501:10000),]
+trace5 <- trace_S02[c(10001:12500),]
+trace6 <- trace_S02[c(12501:15000),]
+trace7 <- trace_S02[c(15001:15034),]
+
+write.table(trace1, "trace1_S02.csv", row.names= FALSE, sep=",")
+write.table(trace2, "trace2_S02.csv", row.names= FALSE, sep=",")
+write.table(trace3, "trace3_S02.csv", row.names= FALSE, sep=",")
+write.table(trace4, "trace4_S02.csv", row.names= FALSE, sep=",")
+write.table(trace5, "trace5_S02.csv", row.names= FALSE, sep=",")
+write.table(trace6, "trace6_S02.csv", row.names= FALSE, sep=",")
+write.table(trace7, "trace7_S02.csv", row.names= FALSE, sep=",")
+
+# la premiere partie de 15035 ->30745
+
+trace8 <- trace_S02[c(15035:17500),]
+trace9 <- trace_S02[c(17501:20000),]
+trace10 <- trace_S02[c(20001:22500),]
+trace11 <- trace_S02[c(22501:25000),]
+trace12 <- trace_S02[c(25001:27500),]
+trace13 <- trace_S02[c(27501:30000),]
+trace14 <- trace_S02[c(30001:32500),]
+trace15 <- trace_S02[c(32501:30745),]
+
+
+write.table(trace8, "trace8_S02.csv", row.names= FALSE, sep=",")
+write.table(trace9, "trace9_S02.csv", row.names= FALSE, sep=",")
+write.table(trace10, "trace10_S02.csv", row.names= FALSE, sep=",")
+write.table(trace11, "trace11_S02.csv", row.names= FALSE, sep=",")
+write.table(trace12, "trace12_S02.csv", row.names= FALSE, sep=",")
+write.table(trace13, "trace13_S02.csv", row.names= FALSE, sep=",")
+write.table(trace14, "trace14_S02.csv", row.names= FALSE, sep=",")
+write.table(trace15, "trace15_S02.csv", row.names= FALSE, sep=",")
+
+# la premiere partie de 30746 ->  43146
+
+trace16 <- trace_S02[c(30746:32500),]
+trace17 <- trace_S02[c(32501:35000),]
+trace18 <- trace_S02[c(35001:37500),]
+trace19 <- trace_S02[c(37501:40000),]
+trace20 <- trace_S02[c(40001:42500),]
+trace21 <- trace_S02[c(42501:43146),]
+
+
+write.table(trace16, "trace16_S02.csv", row.names= FALSE, sep=",")
+write.table(trace17, "trace17_S02.csv", row.names= FALSE, sep=",")
+write.table(trace18, "trace18_S02.csv", row.names= FALSE, sep=",")
+write.table(trace19, "trace19_S02.csv", row.names= FALSE, sep=",")
+write.table(trace20, "trace20_S02.csv", row.names= FALSE, sep=",")
+write.table(trace21, "trace21_S02.csv", row.names= FALSE, sep=",")
+
+# 43147 -> 54361
+
+trace22 <- trace_S02[c(43147:45500),]
+trace23 <- trace_S02[c(45501:48000),]
+trace24 <- trace_S02[c(48001:50500),]
+trace25 <- trace_S02[c(50501:53000),]
+trace26 <- trace_S02[c(53001:54361),]
+
+
+write.table(trace22, "trace22_S02.csv", row.names= FALSE, sep=",")
+write.table(trace23, "trace23_S02.csv", row.names= FALSE, sep=",")
+write.table(trace24, "trace24_S02.csv", row.names= FALSE, sep=",")
+write.table(trace25, "trace25_S02.csv", row.names= FALSE, sep=",")
+write.table(trace26, "trace26_S02.csv", row.names= FALSE, sep=",")
+
+# 54362 -> 69699
+trace27 <- trace_S02[c(54362:56500),]
+trace28 <- trace_S02[c(56501:59000),]
+trace29 <- trace_S02[c(59001:61500),]
+trace29 <- trace_S02[c(61501:64000),]
+trace30 <- trace_S02[c(64001:66500),]
+trace31 <- trace_S02[c(66501:69000),]
+trace32 <- trace_S02[c(69001:69699),]
+
+write.table(trace27, "trace27_S02.csv", row.names= FALSE, sep=",")
+write.table(trace28, "trace28_S02.csv", row.names= FALSE, sep=",")
+write.table(trace29, "trace29_S02.csv", row.names= FALSE, sep=",")
+write.table(trace30, "trace30_S02.csv", row.names= FALSE, sep=",")
+write.table(trace31, "trace31_S02.csv", row.names= FALSE, sep=",")
+write.table(trace32, "trace32_S02.csv", row.names= FALSE, sep=",")
+
+#69700  81051
+
+trace33 <- trace_S02[c(69700:72000),]
+trace34 <- trace_S02[c(72001:74500),]
+trace35 <- trace_S02[c(74501:77000),]
+trace36 <- trace_S02[c(77001:79500),]
+trace37 <- trace_S02[c(79501:81051),]
+
+write.table(trace33, "trace33_S02.csv", row.names= FALSE, sep=",")
+write.table(trace34, "trace34_S02.csv", row.names= FALSE, sep=",")
+write.table(trace35, "trace35_S02.csv", row.names= FALSE, sep=",")
+write.table(trace36, "trace36_S02.csv", row.names= FALSE, sep=",")
+write.table(trace37, "trace37_S02.csv", row.names= FALSE, sep=",")
+
+
+# 81051  88816
+
+trace38 <- trace_S02[c(81051:83500),]
+trace39 <- trace_S02[c(83501:86000),]
+trace40 <- trace_S02[c(86001:88500),]
+trace41 <- trace_S02[c(88501:88816),]
+
+write.table(trace38, "trace38_S02.csv", row.names= FALSE, sep=",")
+write.table(trace39, "trace39_S02.csv", row.names= FALSE, sep=",")
+write.table(trace40, "trace40_S02.csv", row.names= FALSE, sep=",")
+write.table(trace41, "trace41_S02.csv", row.names= FALSE, sep=",")
+
+
+# 88817 101657
+
+trace42 <- trace_S02[c(88817:90500),]
+trace43 <- trace_S02[c(90501:93000),]
+trace44 <- trace_S02[c(93001:95500),]
+trace45 <- trace_S02[c(95501:98000),]
+trace46 <- trace_S02[c(98001:100500),]
+trace47 <- trace_S02[c(100501:101657),]
+
+write.table(trace42, "trace42_S02.csv", row.names= FALSE, sep=",")
+write.table(trace43, "trace43_S02.csv", row.names= FALSE, sep=",")
+write.table(trace44, "trace44_S02.csv", row.names= FALSE, sep=",")
+write.table(trace45, "trace45_S02.csv", row.names= FALSE, sep=",")
+write.table(trace46, "trace46_S02.csv", row.names= FALSE, sep=",")
+write.table(trace47, "trace47_S02.csv", row.names= FALSE, sep=",")
+
+#101658 113490
+
+trace48 <- trace_S02[c(101658:104100),]
+trace49 <- trace_S02[c(204101:106600),]
+trace50 <- trace_S02[c(106601:109100),]
+trace51 <- trace_S02[c(109101:111600),]
+trace52 <- trace_S02[c(111601:113490),]
+
+write.table(trace48, "trace48_S02.csv", row.names= FALSE, sep=",")
+write.table(trace49, "trace49_S02.csv", row.names= FALSE, sep=",")
+write.table(trace50, "trace50_S02.csv", row.names= FALSE, sep=",")
+write.table(trace51, "trace51_S02.csv", row.names= FALSE, sep=",")
+write.table(trace52, "trace52_S02.csv", row.names= FALSE, sep=",")
+
+# 113490 125251
+
+trace53 <- trace_S02[c(113490:115900),]
+trace54 <- trace_S02[c(115901:118400),]
+trace55 <- trace_S02[c(118401:120900),]
+trace56 <- trace_S02[c(120901:123400),]
+trace57 <- trace_S02[c(123401:125250),]
+
+write.table(trace53, "trace53_S02.csv", row.names= FALSE, sep=",")
+write.table(trace54, "trace54_S02.csv", row.names= FALSE, sep=",")
+write.table(trace55, "trace55_S02.csv", row.names= FALSE, sep=",")
+write.table(trace56, "trace56_S02.csv", row.names= FALSE, sep=",")
+write.table(trace57, "trace57_S02.csv", row.names= FALSE, sep=",")
+
+# #125251 137574
+trace58 <- trace_S02[c(125251:127700),]
+trace59 <- trace_S02[c(127701:130200),]
+trace60 <- trace_S02[c(130201:132700),]
+trace61 <- trace_S02[c(132701:135200),]
+trace62 <- trace_S02[c(135201:137573),]
+
+write.table(trace58, "trace58_S02.csv", row.names= FALSE, sep=",")
+write.table(trace59, "trace59_S02.csv", row.names= FALSE, sep=",")
+write.table(trace60, "trace60_S02.csv", row.names= FALSE, sep=",")
+write.table(trace61, "trace61_S02.csv", row.names= FALSE, sep=",")
+write.table(trace62, "trace62_S02.csv", row.names= FALSE, sep=",")
+
+#137574 152559
+
+trace63 <- trace_S02[c(137574:140000),]
+trace64 <- trace_S02[c(140001:142500),]
+trace65 <- trace_S02[c(142501:145000),]
+trace66 <- trace_S02[c(145001:147500),]
+trace67 <- trace_S02[c(147501:150000),]
+trace68 <- trace_S02[c(150001:152500),]
+trace69 <- trace_S02[c(152501:152558),]
+
+
+write.table(trace63, "trace63_S02.csv", row.names= FALSE, sep=",")
+write.table(trace64, "trace64_S02.csv", row.names= FALSE, sep=",")
+write.table(trace65, "trace65_S02.csv", row.names= FALSE, sep=",")
+write.table(trace66, "trace66_S02.csv", row.names= FALSE, sep=",")
+write.table(trace67, "trace67_S02.csv", row.names= FALSE, sep=",")
+write.table(trace68, "trace68_S02.csv", row.names= FALSE, sep=",")
+write.table(trace69, "trace69_S02.csv", row.names= FALSE, sep=",")
+
+#152559 166929
+
+trace70 <- trace_S02[c(152559:155000),]
+trace71 <- trace_S02[c(155001:157500),]
+trace72 <- trace_S02[c(157501:160000),]
+trace73 <- trace_S02[c(160001:162500),]
+trace74 <- trace_S02[c(162501:165000),]
+trace75 <- trace_S02[c(165001:166929),]
+
+write.table(trace70, "trace70_S02.csv", row.names= FALSE, sep=",")
+write.table(trace71, "trace71_S02.csv", row.names= FALSE, sep=",")
+write.table(trace72, "trace72_S02.csv", row.names= FALSE, sep=",")
+write.table(trace73, "trace73_S02.csv", row.names= FALSE, sep=",")
+write.table(trace74, "trace74_S02.csv", row.names= FALSE, sep=",")
+write.table(trace75, "trace75_S02.csv", row.names= FALSE, sep=",")
+
+```

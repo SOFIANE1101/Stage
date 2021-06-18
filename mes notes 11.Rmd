@@ -1,0 +1,321 @@
+---
+title: "mes notes 11"
+author: "Sofiane Benhamouche"
+date: "11/06/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+L'indice de chaque début d'un conducteur et l'indice de la dernière ligne de data frame
+```{r}
+debut_conducteur <- function(d){
+  # false pour chaque début de nouveau conducteur
+  d$lagID <- d$DriverID==lag(d$DriverID) 
+  #Remplace le NA de début de df avec FALSE
+  d$lagID[is.na(d$lagID)] <- "FALSE"
+  d$lagID<- as.logical(d$lagID)
+  #compter de premier FALSE inclus au deuxième FALSE exclus
+  lst_indice_debut_conducteur <- c()
+  
+  for (i in 1: nrow(d)) {
+    if(d$lagID[i] == FALSE){
+      lst_indice_debut_conducteur <- c(lst_indice_debut_conducteur,i)
+    }
+  }
+  # Ajouter l'indice de la dernière ligne
+  lst_indice_debut_conducteur <-  c(lst_indice_debut_conducteur,nrow(d)) 
+  print(lst_indice_debut_conducteur)
+  return(lst_indice_debut_conducteur)
+  
+}
+indice_debut_conducteur <-debut_conducteur(data_Expe011)
+```
+
+```{r}
+data_S02 <- subset(data_Expe011,DriverID == "S02")
+```
+
+NumRecord
+
+```{r}
+## Colonne_NumRecord Experience 1
+Colonne_NumRecord <- function(d){
+  
+  pb <- txtProgressBar(min = 1, max = nrow(d) , style = 3)
+  
+  Record <- c(1)
+  compteur <-1
+    
+  for (i in 1: (nrow(d)-1)) {
+    if (d$ODOMETER[i+1] >= d$ODOMETER[i]) {
+      Record <- c(Record,compteur+1)
+    }else{
+      compteur <-1
+      Record <- c(Record,compteur)
+    }
+    compteur <- compteur +1
+    setTxtProgressBar(pb, i)
+  }
+  return(Record)
+}
+
+data_S02$NumRecord  <- Colonne_NumRecord(data_S02)
+```
+
+
+L'indice de chaque début de chaque sous trajet d'un conducteur et l'indice de la dernière ligne de data frame
+
+```{r}
+debut_conducteur <- function(d){
+  # false pour chaque début de nouveau tour
+  d$lagID <- lead(lag(d$NumRecord==1))
+  #Remplace le NA de la fin par FALSE
+  d$lagID[is.na(d$lagID)] <- "FALSE"
+  #modifiez les valeurs de la colonne en valeurs logiques
+  d$lagID<- as.logical(d$lagID)
+  lst_indice_debut_conducteur <- c()
+  
+  for (i in 1: nrow(d)) {
+      if(d$lagID[i] == TRUE){
+      lst_indice_debut_conducteur <- c(lst_indice_debut_conducteur,i)
+    }
+  }
+  # Ajouter l'indice de la dernière ligne
+  lst_indice_debut_conducteur <-  c(lst_indice_debut_conducteur,nrow(d)) 
+  print(lst_indice_debut_conducteur)
+  return(lst_indice_debut_conducteur)
+}
+indice_debut_conducteur <-debut_conducteur(data_S02)
+```
+
+# Extraction des distance parcouru au niveau d'un panneau pour le conducteur S02
+
+```{r}
+trace_S02 <- data_S02 %>% dplyr::select (ODOMETER,Distance_cum,NumRecord, 
+                                               LATITUDE, LONGITUDE)
+```
+
+# trassage
+```{r}
+# la premiere partie de 1 -> 15034
+##
+trace1 <- trace_S02[c(1:2500),]
+trace2 <- trace_S02[c(2501:5000),]
+trace3 <- trace_S02[c(5001:7500),]
+trace4 <- trace_S02[c(7501:10000),]
+trace5 <- trace_S02[c(10001:12500),]
+trace6 <- trace_S02[c(12501:15000),]
+trace7 <- trace_S02[c(15001:15034),]
+
+write.table(trace1, "trace1_S02.csv", row.names= FALSE, sep=",")
+write.table(trace2, "trace2_S02.csv", row.names= FALSE, sep=",")
+write.table(trace3, "trace3_S02.csv", row.names= FALSE, sep=",")
+write.table(trace4, "trace4_S02.csv", row.names= FALSE, sep=",")
+write.table(trace5, "trace5_S02.csv", row.names= FALSE, sep=",")
+write.table(trace6, "trace6_S02.csv", row.names= FALSE, sep=",")
+write.table(trace7, "trace7_S02.csv", row.names= FALSE, sep=",")
+
+# la premiere partie de 15035 ->30745
+
+trace8 <- trace_S02[c(15035:17500),]
+trace9 <- trace_S02[c(17501:20000),]
+trace10 <- trace_S02[c(20001:22500),]
+trace11 <- trace_S02[c(22501:25000),]
+trace12 <- trace_S02[c(25001:27500),]
+trace13 <- trace_S02[c(27501:30000),]
+trace14 <- trace_S02[c(30001:32500),]
+trace15 <- trace_S02[c(32501:30745),]
+
+
+write.table(trace8, "trace8_S02.csv", row.names= FALSE, sep=",")
+write.table(trace9, "trace9_S02.csv", row.names= FALSE, sep=",")
+write.table(trace10, "trace10_S02.csv", row.names= FALSE, sep=",")
+write.table(trace11, "trace11_S02.csv", row.names= FALSE, sep=",")
+write.table(trace12, "trace12_S02.csv", row.names= FALSE, sep=",")
+write.table(trace13, "trace13_S02.csv", row.names= FALSE, sep=",")
+write.table(trace14, "trace14_S02.csv", row.names= FALSE, sep=",")
+write.table(trace15, "trace15_S02.csv", row.names= FALSE, sep=",")
+
+# la premiere partie de 30746 ->  43146
+
+trace16 <- trace_S02[c(30746:32500),]
+trace17 <- trace_S02[c(32501:35000),]
+trace18 <- trace_S02[c(35001:37500),]
+trace19 <- trace_S02[c(37501:40000),]
+trace20 <- trace_S02[c(40001:42500),]
+trace21 <- trace_S02[c(42501:43146),]
+
+
+write.table(trace16, "trace16_S02.csv", row.names= FALSE, sep=",")
+write.table(trace17, "trace17_S02.csv", row.names= FALSE, sep=",")
+write.table(trace18, "trace18_S02.csv", row.names= FALSE, sep=",")
+write.table(trace19, "trace19_S02.csv", row.names= FALSE, sep=",")
+write.table(trace20, "trace20_S02.csv", row.names= FALSE, sep=",")
+write.table(trace21, "trace21_S02.csv", row.names= FALSE, sep=",")
+
+# 43147 -> 54361
+
+trace22 <- trace_S02[c(43147:45500),]
+trace23 <- trace_S02[c(45501:48000),]
+trace24 <- trace_S02[c(48001:50500),]
+trace25 <- trace_S02[c(50501:53000),]
+trace26 <- trace_S02[c(53001:54361),]
+
+
+write.table(trace22, "trace22_S02.csv", row.names= FALSE, sep=",")
+write.table(trace23, "trace23_S02.csv", row.names= FALSE, sep=",")
+write.table(trace24, "trace24_S02.csv", row.names= FALSE, sep=",")
+write.table(trace25, "trace25_S02.csv", row.names= FALSE, sep=",")
+write.table(trace26, "trace26_S02.csv", row.names= FALSE, sep=",")
+
+# 54362 -> 69699
+trace27 <- trace_S02[c(54362:56500),]
+trace28 <- trace_S02[c(56501:59000),]
+trace29 <- trace_S02[c(59001:61500),]
+trace29 <- trace_S02[c(61501:64000),]
+trace30 <- trace_S02[c(64001:66500),]
+trace31 <- trace_S02[c(66501:69000),]
+trace32 <- trace_S02[c(69001:69699),]
+
+write.table(trace27, "trace27_S02.csv", row.names= FALSE, sep=",")
+write.table(trace28, "trace28_S02.csv", row.names= FALSE, sep=",")
+write.table(trace29, "trace29_S02.csv", row.names= FALSE, sep=",")
+write.table(trace30, "trace30_S02.csv", row.names= FALSE, sep=",")
+write.table(trace31, "trace31_S02.csv", row.names= FALSE, sep=",")
+write.table(trace32, "trace32_S02.csv", row.names= FALSE, sep=",")
+
+#69700  81051
+
+trace33 <- trace_S02[c(69700:72000),]
+trace34 <- trace_S02[c(72001:74500),]
+trace35 <- trace_S02[c(74501:77000),]
+trace36 <- trace_S02[c(77001:79500),]
+trace37 <- trace_S02[c(79501:81051),]
+
+write.table(trace33, "trace33_S02.csv", row.names= FALSE, sep=",")
+write.table(trace34, "trace34_S02.csv", row.names= FALSE, sep=",")
+write.table(trace35, "trace35_S02.csv", row.names= FALSE, sep=",")
+write.table(trace36, "trace36_S02.csv", row.names= FALSE, sep=",")
+write.table(trace37, "trace37_S02.csv", row.names= FALSE, sep=",")
+
+
+# 81051  88816
+
+trace38 <- trace_S02[c(81051:83500),]
+trace39 <- trace_S02[c(83501:86000),]
+trace40 <- trace_S02[c(86001:88500),]
+trace41 <- trace_S02[c(88501:88816),]
+
+write.table(trace38, "trace38_S02.csv", row.names= FALSE, sep=",")
+write.table(trace39, "trace39_S02.csv", row.names= FALSE, sep=",")
+write.table(trace40, "trace40_S02.csv", row.names= FALSE, sep=",")
+write.table(trace41, "trace41_S02.csv", row.names= FALSE, sep=",")
+
+
+# 88817 101657
+
+trace42 <- trace_S02[c(88817:90500),]
+trace43 <- trace_S02[c(90501:93000),]
+trace44 <- trace_S02[c(93001:95500),]
+trace45 <- trace_S02[c(95501:98000),]
+trace46 <- trace_S02[c(98001:100500),]
+trace47 <- trace_S02[c(100501:101657),]
+
+write.table(trace42, "trace42_S02.csv", row.names= FALSE, sep=",")
+write.table(trace43, "trace43_S02.csv", row.names= FALSE, sep=",")
+write.table(trace44, "trace44_S02.csv", row.names= FALSE, sep=",")
+write.table(trace45, "trace45_S02.csv", row.names= FALSE, sep=",")
+write.table(trace46, "trace46_S02.csv", row.names= FALSE, sep=",")
+write.table(trace47, "trace47_S02.csv", row.names= FALSE, sep=",")
+
+#101658 113490
+
+trace48 <- trace_S02[c(101658:104100),]
+trace49 <- trace_S02[c(204101:106600),]
+trace50 <- trace_S02[c(106601:109100),]
+trace51 <- trace_S02[c(109101:111600),]
+trace52 <- trace_S02[c(111601:113490),]
+
+write.table(trace48, "trace48_S02.csv", row.names= FALSE, sep=",")
+write.table(trace49, "trace49_S02.csv", row.names= FALSE, sep=",")
+write.table(trace50, "trace50_S02.csv", row.names= FALSE, sep=",")
+write.table(trace51, "trace51_S02.csv", row.names= FALSE, sep=",")
+write.table(trace52, "trace52_S02.csv", row.names= FALSE, sep=",")
+
+# 113490 125251
+
+trace53 <- trace_S02[c(113490:115900),]
+trace54 <- trace_S02[c(115901:118400),]
+trace55 <- trace_S02[c(118401:120900),]
+trace56 <- trace_S02[c(120901:123400),]
+trace57 <- trace_S02[c(123401:125250),]
+
+write.table(trace53, "trace53_S02.csv", row.names= FALSE, sep=",")
+write.table(trace54, "trace54_S02.csv", row.names= FALSE, sep=",")
+write.table(trace55, "trace55_S02.csv", row.names= FALSE, sep=",")
+write.table(trace56, "trace56_S02.csv", row.names= FALSE, sep=",")
+write.table(trace57, "trace57_S02.csv", row.names= FALSE, sep=",")
+
+# #125251 137574
+trace58 <- trace_S02[c(125251:127700),]
+trace59 <- trace_S02[c(127701:130200),]
+trace60 <- trace_S02[c(130201:132700),]
+trace61 <- trace_S02[c(132701:135200),]
+trace62 <- trace_S02[c(135201:137573),]
+
+write.table(trace58, "trace58_S02.csv", row.names= FALSE, sep=",")
+write.table(trace59, "trace59_S02.csv", row.names= FALSE, sep=",")
+write.table(trace60, "trace60_S02.csv", row.names= FALSE, sep=",")
+write.table(trace61, "trace61_S02.csv", row.names= FALSE, sep=",")
+write.table(trace62, "trace62_S02.csv", row.names= FALSE, sep=",")
+
+#137574 152559
+
+trace63 <- trace_S02[c(137574:140000),]
+trace64 <- trace_S02[c(140001:142500),]
+trace65 <- trace_S02[c(142501:145000),]
+trace66 <- trace_S02[c(145001:147500),]
+trace67 <- trace_S02[c(147501:150000),]
+trace68 <- trace_S02[c(150001:152500),]
+trace69 <- trace_S02[c(152501:152558),]
+
+
+write.table(trace63, "trace63_S02.csv", row.names= FALSE, sep=",")
+write.table(trace64, "trace64_S02.csv", row.names= FALSE, sep=",")
+write.table(trace65, "trace65_S02.csv", row.names= FALSE, sep=",")
+write.table(trace66, "trace66_S02.csv", row.names= FALSE, sep=",")
+write.table(trace67, "trace67_S02.csv", row.names= FALSE, sep=",")
+write.table(trace68, "trace68_S02.csv", row.names= FALSE, sep=",")
+write.table(trace69, "trace69_S02.csv", row.names= FALSE, sep=",")
+
+#152559 166929
+
+trace70 <- trace_S02[c(152559:155000),]
+trace71 <- trace_S02[c(155001:157500),]
+trace72 <- trace_S02[c(157501:160000),]
+trace73 <- trace_S02[c(160001:162500),]
+trace74 <- trace_S02[c(162501:165000),]
+trace75 <- trace_S02[c(165001:166929),]
+
+write.table(trace70, "trace70_S02.csv", row.names= FALSE, sep=",")
+write.table(trace71, "trace71_S02.csv", row.names= FALSE, sep=",")
+write.table(trace72, "trace72_S02.csv", row.names= FALSE, sep=",")
+write.table(trace73, "trace73_S02.csv", row.names= FALSE, sep=",")
+write.table(trace74, "trace74_S02.csv", row.names= FALSE, sep=",")
+write.table(trace75, "trace75_S02.csv", row.names= FALSE, sep=",")
+
+```
+
+
+
+
+```{r}
+# entre ID 56 et 57
+# 55_F70_Rive_Droite         ODOMETER	805.6  Distance_cum	72891.3
+```
+
+
